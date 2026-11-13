@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>NAMCC Parking and Patio Concept</title>
+<link rel="stylesheet" href="assets/style.css">
+
+<script>
+/* =====================================================================
+   CONFIG  -  everything you are likely to change lives in this one block.
+
+   All sizes are in FEET.  Site coordinates:
+     x = east, measured along the south property line from the SW corner
+     y = north (toward the top of the exhibit)
+   So [0, 0] is the SW property corner and the 324.32' south line runs
+   from [0, 0] to [324.32, 0].  Negative y is the driveway heading down
+   to N Lamar Blvd.
+   ===================================================================== */
+window.NAMCC_CONFIG = {
+
+  /* =====================  WALK THE WHOLE CAMPUS?  =====================
+     false = visitors can only walk the NEW lot, patio and driveway.
+     true  = visitors can also walk the existing campus (masjid, courts, parking).
+     This one word is the only thing to change.                              */
+  walkWholeCampus: false,
+
+  /* ---------- BANNER (left panel) : placeholders, edit freely ---------- */
+  banner: {
+    widthPercent: 18,                       // share of the screen used by the banner
+    eyebrow: 'North Austin Muslim Community Center',
+    title: 'More parking. A place to gather.',
+    message: [
+      'This is a concept view of the planned parking lot, driveway and covered community patio on our new lot.',
+      'Your support turns this vision into reality. Explore the plans, then scan the code to give and help us build our home.'
+    ],
+    showFacts: true,                        // auto-filled stall / patio / table numbers
+    qrImage: 'assets/qr.png',                            // e.g. 'assets/qr.png'. Empty = placeholder box
+    qrCaption: 'Scan to learn more',
+    footer: 'Concept only. Not for construction.'
+  },
+
+  /* ---------- KIOSK BEHAVIOUR ---------- */
+  kiosk: {
+    idleSeconds: 90,          // no touch for this long -> glide to aerial view and orbit
+    orbitSecondsPerLap: 150,  // speed of the idle orbit
+    walkSpeed: 20,            // feet per second
+    runMultiplier: 1.6,       // hold Shift on a keyboard to move this much faster
+    tapToGo: true,            // double-tap / double-click a spot to glide there
+    tapGoMaxDistance: 260,    // longest glide from one double-tap, in feet
+    mouseWheelStep: 9,        // feet moved per notch of a mouse wheel
+    eyeHeight: 5.5,           // feet
+    fieldOfView: 62,          // vertical, degrees
+    dragSensitivity: 0.2,     // degrees of turn per pixel dragged
+    invertDrag: false,        // false = drag the scene (street-view style)
+    dpadSideButtons: 'strafe',// 'strafe' = step left/right, 'turn' = rotate left/right
+    aerialLabels: true,       // name tags over the site in the aerial view
+    hideCursor: true,         // no pointer on the touch screen ...
+    showCursorForMouse: true, // ... but show it while a real mouse is being moved
+    mouseCursorSeconds: 20,   // hide it again after this long without mouse movement
+    showFps: false,
+    mobilePixelRatio: 2,      // phones and tablets may render sharper than the kiosk (which stays at 1)
+    minHorizontalFov: 58,     // widens the view on tall, narrow (portrait) screens
+    antialias: true,          // set false if the Pi drops below 30 fps
+    autoQuality: true         // lowers render resolution by itself if fps stays under 27
+  },
+
+  /* ---------- PROPERTY ---------- */
+  site: {
+    southLine: 324.32,        // labelled on the exhibit
+    westLine: 231.54,         // labelled on the exhibit
+    northLimit: 168,          // how far north the walkable concept area goes
+    eastLineX0: 340.5,        // east property line: x at y = 0 ...
+    eastLineSlope: -0.0155,   // ... and how much x changes per foot of y
+    lamarAngleDeg: 8.67       // N Lamar Blvd is turned this much relative to the south line
+  },
+
+  /* ---------- PARKING LOT ---------- */
+  parking: {
+    stallWidth: 9,
+    stallDepth: 18,
+    aisleWidth: 25,
+    lineWidth: 0.33,          // 4 inch paint
+    // West leg (runs north-south along the west line)
+    leg:  { x0: 0, y0: 18, y1: 138 },
+    // Main band (runs east-west along the south line)
+    band: { x0: 21, x1: 337 },
+    // Stall rows. Each row is a line "from -> to" (the back of the stalls);
+    // stalls open toward "side" of that line (+1 = left of travel, -1 = right).
+    // maxStalls caps a row if you want fewer. avoidHouse rows are split
+    // around the stone house automatically (see house.clearance).
+    rows: [
+      { name: 'Leg, west side',    from: [0, 18.4],     to: [0, 136.4],      side: -1 },
+      { name: 'Leg, east side',    from: [61, 45.5],    to: [61, 135.5],     side: 1 },
+      { name: 'Band south, west',  from: [21.2, 0],     to: [201.8, 0],      side: 1 },
+      { name: 'Band south, east',  from: [210.6, 0],    to: [309.7, 0],      side: 1 },
+      { name: 'Band north, west',  from: [61, 61],      to: [201.8, 61],     side: -1, avoidHouse: true },
+      { name: 'Band north, east',  from: [210.6, 61],   to: [336.6, 61],     side: -1 },
+      { name: 'Driveway',          from: [329.0, -173.7], to: [331.6, -327.2], side: 1 }
+    ],
+    // Small landscaped islands inside the rows: [x0, y0, x1, y1]
+    islands: [
+      [201.8, 0.5, 210.6, 17],
+      [201.8, 44, 210.6, 60.5],
+      [310.5, 0.5, 323.4, 17]
+    ]
+  },
+
+  /* ---------- DRIVEWAY (outline traced from the exhibit) ---------- */
+  driveway: {
+    // west edge, north to south, then the Lamar curb, then east edge back north
+    outline: [
+      [324.1, 20], [324.2, 0], [325.2, -60], [326.1, -116], [326.1, -130], [326.8, -135],
+      [327.9, -140], [329.4, -145], [331.6, -150], [334.8, -155], [338.5, -160],
+      [344.0, -165], [346.6, -169], [347.4, -173.7],
+      [329.0, -173.7], [331.6, -327.2],                       // back of the driveway stalls
+      [347.6, -327.2], [349.6, -331], [349.9, -336], [349.8, -340], [349.1, -345],
+      [348.2, -350], [346.6, -355], [344.2, -360], [341.5, -365], [337.9, -370],
+      [334.8, -375], [332.7, -380], [331.4, -385], [330.6, -390], [329.9, -395],
+      [330.1, -400], [330.9, -405], [331.8, -410], [332.5, -419.6],
+      [347.9, -416.8],                                         // curb at N Lamar Blvd
+      [347.0, -410], [346.1, -405], [345.1, -400], [345.2, -395], [345.8, -390],
+      [346.8, -385], [349.5, -380], [352.7, -375], [355.9, -370], [359.1, -365],
+      [362.2, -360], [365.2, -355], [368.0, -350], [370.4, -345], [372.3, -340],
+      [373.5, -336], [374.4, -332], [375.4, -326], [374.2, -250], [373.1, -176],
+      [372.9, -168], [372.1, -165], [370.2, -160], [367.6, -155], [364.3, -150],
+      [359.6, -145], [353.0, -140], [344.2, -135], [341.7, -130], [341.5, -126],
+      [341.8, -122], [343.6, -119], [345.7, -116], [345.9, -113], [344.6, -60],
+      [343.1, 0], [342.6, 20], [342.2, 30], [341.0, 35], [338.3, 40], [337.3, 43]
+    ],
+    curbPoint: [339.5, -418.4],   // middle of the driveway at the Lamar curb
+    rowDepth: 17.5                // curb to the right-of-way line
+  },
+
+  /* ---------- COVERED PATIO ---------- */
+  patio: {
+    x: 184, y: 66,            // SW corner
+    length: 150,              // east-west
+    width: 75,                // north-south
+    slabHeight: 0.5,
+    columnSpacing: 25,        // target; evened out to fit the slab
+    columnInset: 1.5,         // outer columns sit this far inside the slab edge
+    columnSize: 1,
+    eaveHeight: 12,
+    roofRise: 3,              // low slope: ridge is this much above the eave. 0 = flat
+    roofOverhang: 3,
+    tableRows: 6,             // rows running east-west
+    tablesPerRow: 18,         // 6 x 18 = 108 tables
+    tableLength: 6
+  },
+
+  /* ---------- EXISTING STONE HOUSE (stays) ---------- */
+  house: {
+    clearance: 10,            // stalls are kept this far away from the house
+    wallHeight: 9,
+    roofRise: 6,
+    // footprint from the exhibit, as simple blocks: [x0, y0, x1, y1]
+    blocks: [
+      { rect: [101, 59, 128.6, 91],     ridge: 'y' },                              // main block
+      { rect: [93.2, 91, 122.7, 103.4], ridge: 'x', roofRise: 4.5 },               // north wing
+      { rect: [99.8, 52, 114.8, 59],    ridge: 'x', wallHeight: 8, roofRise: 2.5 } // south wing
+    ],
+    porch: [114.8, 52, 129.5, 59],   // covered concrete porch
+    // The separate wood building touching the east side of the house on the exhibit.
+    woodBuilding: { show: false, rect: [131, 82, 171, 102.5] }
+  },
+
+  /* ---------- FENCE (property line next to Lot 2) ---------- */
+  fence: {
+    height: 6,
+    panelLength: 8,
+    runs: [
+      [[-0.4, 231.5], [-0.4, -0.4]],                 // west line
+      [[-0.4, -0.4], [323.9, -0.4]],                 // south line
+      [[323.9, -0.4], [330.4, -385]]                 // west side of the driveway strip
+    ]
+  },
+
+  /* ---------- EXISTING CAMPUS (east of the new lot, traced from the exhibit's base map) ---------- */
+  campus: {
+    // where visitors may walk on the campus when walkWholeCampus is true
+    walkArea: [[341, 1], [339, 128], [704, 128], [712.5, -342], [347, -398], [332.5, -386], [326, -1]],
+    lamarEntrance: [168, 204],   // existing curb cut: feet east along Lamar from the centre of the new driveway
+    ironFence: { height: 5, setback: 19, runs: [[26, 164], [208, 372]] },   // along Lamar, same measure
+    masjid: {
+      // two-storey hall (drawn as "Building 6 addition" on the exhibit, 36.4 ft high)
+      hall: { height: 36.4, outline: [
+        [517.4, 102.8], [593.1, 82.5], [588.6, 65.9], [596.0, 63.9], [586.3, 27.7], [589.5, 26.9],
+        [582.4, 0.7], [579.2, 1.5], [569.1, -36.4], [556.2, -32.9], [547.3, -66.3], [527.0, -60.9],
+        [529.1, -53.0], [510.9, -48.1], [510.4, -50.3], [478.6, -41.7]
+      ] },
+      // one-storey west wing ("Ex Building 6", 8,921 sq ft); height is an estimate
+      wing: { height: 20, outline: [[452.0, 123.0], [519.6, 105.2], [482.8, -30.6], [415.6, -12.6]] },
+      dome: { x: 515, y: -20, radius: 10, drumHeight: 5 }
+    },
+    // top deck of the parking garage, level with the ground
+    garageDeck: { wallHeight: 3.5, wallEdges: [0, 1, 2, 3, 4, 5], outline: [
+      [590, 84], [648, 68], [651, 57], [684, 48], [672, -27], [661, -70], [612, -57], [604, -64], [563, -52], [578, 10]
+    ] },
+    // rectangles are [x0, y0, x1, y1]
+    basketball: { apron: [347.5, -104.5, 401.5, -5.5], surface: [353, -98.5, 397.5, -11.5], court: [356.5, -96, 394, -14], fenceHeight: 10 },
+    volleyball: { sand: [379, 32, 409, 90], netHeight: 8 },   // not on the exhibit: placed from drone photo DJI_0043
+    // simple pitched-roof buildings: centre, [length along the ridge, width], angle (degrees, 0 = ridge runs east-west)
+    buildings: [
+      { name: 'Building 7 (wood building)', center: [395.5, 20.2],  size: [40, 14.5], angle: 0,   wallHeight: 9,  roofRise: 3.5, wall: 'woodWall', roof: 'woodRoof' },
+      { name: 'Building 2',                 center: [539.5, -227.8], size: [43, 43.5], angle: 0,   wallHeight: 10, roofRise: 6 },
+      { name: 'Building 1 (main)',          center: [660, -216.5],  size: [64, 37],   angle: 0,   wallHeight: 10, roofRise: 6 },
+      { name: 'Building 1 (west wing)',     center: [619, -214],    size: [58, 18],   angle: 90,  wallHeight: 10, roofRise: 4 },
+      { name: 'Building 3 (north)',         center: [650.5, -101.5], size: [23, 15],   angle: 90,  wallHeight: 9,  roofRise: 3.5 },
+      { name: 'Building 3 (south)',         center: [661.5, -129.5], size: [27, 25],   angle: 0,   wallHeight: 9,  roofRise: 5 },
+      { name: 'Building 4',                 center: [687, -65],     size: [20, 7],    angle: 105, wallHeight: 8,  roofRise: 2 }
+    ],
+    // existing asphalt parking lot and its entrance from Lamar
+    asphalt: [
+      [[347, -112], [418, -112], [420, -131], [432, -131], [432, -57], [522, -57], [540, -68], [556, -73],
+       [590, -82], [590, -160], [578, -162], [578, -186], [518, -186], [518, -252], [563, -252], [563, -300],
+       [497, -310], [497, -338], [445, -338], [445, -362.8], [347, -377.8]],
+      // main entrance from Lamar: a straight 36 ft drive, square to the road
+      [[505.6, -393.1], [541.2, -387.7], [528.4, -303.7], [492.8, -309.1]]
+    ],
+    // existing concrete walks, drives and slabs
+    concrete: [
+      [[418, -57], [522, -57], [540, -68], [556, -73], [592, -82], [604, -64], [566, -48], [480, -28], [414, -10]],
+      [[407, -9], [416, -12], [452, 123], [443, 125.5]],
+      [[592, -82], [650, -88], [648, -150], [690, -150], [690, -198], [628, -198], [628, -186], [580, -186], [580, -163], [592, -160]],
+      [[350, 6], [375.5, 6], [375.5, 28], [350, 28]],
+      [[563, -252], [567, -252], [567, -356], [563, -356.6]]
+    ],
+    // landscaped islands in the lot: [centre x, centre y, length, width, angle]
+    islands: [
+      [394.5, -168, 37, 13, 0], [394.5, -245, 37, 13, 0], [394.5, -322, 37, 13, 0],
+      [456, -172, 40, 13, 0], [458, -310, 40, 13, 0],
+      [456, -120, 32, 13, 90], [533, -120, 32, 13, 90], [425, -121.5, 19, 13, 90],
+      [510, -169, 20, 12, 0], [510, -268, 22, 14, 0]
+    ],
+    // painted lines: "count" lines, each drawn from start (+ k x step) along "line"
+    stallLines: [
+      { start: [350, -112.3],   step: [9, 0],      count: 8,  line: [0, -17] },
+      { start: [412, -183],     step: [0, -9.3],   count: 6,  line: [-36, 0] },
+      { start: [412, -258],     step: [0, -9.4],   count: 6,  line: [-36, 0] },
+      { start: [394, -176],     step: [0, 0],      count: 1,  line: [0, -61] },
+      { start: [394, -253],     step: [0, 0],      count: 1,  line: [0, -61] },
+      { start: [475.5, -183],   step: [0, -9],     count: 14, line: [-38, 0] },
+      { start: [456.5, -180],   step: [0, 0],      count: 1,  line: [0, -122] },
+      { start: [518, -178],     step: [0, -9.3],   count: 10, line: [-18, 0] },
+      { start: [375.1, -373.5], step: [8.9, 1.36], count: 8,  line: [-2.71, 17.8] },
+      { start: [465, -101.5],   step: [8.6, 0],    count: 8,  line: [0, -37] },
+      { start: [462, -120],     step: [0, 0],      count: 1,  line: [65, 0] },
+      { start: [440, -57.5],    step: [9, 0],      count: 10, line: [0, -17] },
+      { start: [525, -252.5],   step: [9, 0],      count: 5,  line: [0, -17] },
+      { start: [525, -186],     step: [9.5, 0],    count: 6,  line: [0, 20] }
+    ],
+    // surveyed trees from the exhibit: [x, y, canopy radius]. Trees that would stand inside a
+    // building or a court are skipped automatically.
+    trees: [
+      [476.8, 183.0, 19.0], [448.4, 165.5, 29.0], [405.8, 161.5, 27.0], [470.1, 161.3, 8.0], [381.1, 161.0, 13.0],
+      [424.1, 153.9, 21.0], [427.3, 147.9, 9.0], [448.1, 147.5, 20.0], [365.2, 142.8, 8.0], [671.5, 128.3, 8.0],
+      [673.5, 119.7, 10.0], [610.6, 106.3, 28.0], [676.0, 104.7, 10.0], [361.5, 80.2, 21.5], [698.6, 75.9, 36.0],
+      [353.9, 70.1, 13.5], [675.6, 65.7, 12.0], [397.3, 20.4, 21.6], [410.5, -4.7, 8.0], [520.7, -30.7, 8.9],
+      [688.5, -38.0, 8.0], [543.7, -53.5, 10.2], [680.0, -54.0, 8.0], [692.3, -68.5, 9.4], [650.3, -74.8, 10.0],
+      [655.1, -78.1, 12.0], [604.6, -80.2, 8.0], [663.4, -80.6, 8.0], [690.6, -104.9, 17.5], [442.9, -109.0, 13.7],
+      [423.6, -127.2, 10.0], [661.9, -130.9, 12.0], [601.6, -138.7, 10.0], [537.9, -145.0, 6.5], [694.4, -155.2, 8.0],
+      [538.1, -158.6, 5.6], [693.0, -162.3, 12.0], [381.9, -168.8, 8.0], [560.4, -173.0, 10.2], [430.8, -173.1, 6.2],
+      [534.9, -173.3, 10.1], [466.8, -173.7, 9.0], [445.3, -174.6, 8.0], [629.8, -175.0, 12.0], [659.4, -179.6, 36.5],
+      [668.3, -183.1, 19.0], [633.2, -191.7, 19.0], [528.4, -193.3, 17.0], [534.7, -200.9, 16.0], [543.0, -201.4, 13.0],
+      [705.4, -201.5, 14.5], [571.8, -214.4, 27.0], [601.2, -234.1, 25.0], [638.5, -248.5, 18.5], [658.5, -248.9, 9.0],
+      [676.2, -257.7, 9.0], [598.1, -259.2, 9.0], [639.8, -267.6, 17.0], [632.5, -267.7, 21.0], [644.3, -271.3, 18.0],
+      [670.2, -274.6, 15.0], [663.6, -277.6, 13.0], [612.5, -283.3, 17.0], [643.7, -285.4, 10.0], [675.0, -292.9, 18.5],
+      [468.3, -311.3, 8.0], [623.4, -312.6, 13.0], [659.8, -316.8, 20.0], [642.8, -317.1, 9.0], [549.8, -327.9, 25.0],
+      [584.2, -336.2, 8.0], [618.0, -337.5, 26.0], [603.2, -341.2, 19.0], [469.9, -354.7, 13.0], [416.9, -385.4, 13.0]
+    ]
+  },
+
+  /* ---------- TREES ---------- */
+  trees: {
+    seed: 11,
+    // hand-placed trees near the house, matched to the drone photos: [x, y, canopy radius]
+    placed: [
+      [91, 137, 17], [124, 147, 19], [154, 128, 15], [176, 153, 18], [82, 118, 13],
+      [76, 97, 9], [150, 104, 10], [163, 84, 11], [146, 72, 8], [171, 116, 9], [80, 73, 8]
+    ],
+    // scattered zones: rect [x0, y0, x1, y1], how many, canopy radius range.
+    // far = simpler tree used outside the property for the distant tree line.
+    zones: [
+      { name: 'North edge (on site)', rect: [4, 146, 338, 166],      count: 14,  radius: [9, 15] },
+      { name: 'Woods to the north',   rect: [-160, 172, 560, 340],   count: 170, radius: [13, 21], far: true },
+      { name: 'Beyond west fence',    rect: [-170, -60, -9, 172],    count: 55,  radius: [12, 19], far: true },
+      { name: 'Beyond south fence',   rect: [-170, -150, 316, -9],   count: 100, radius: [12, 19], far: true },
+      { name: 'West of driveway',     rect: [150, -392, 318, -150],  count: 62,  radius: [12, 18], far: true },
+      { name: 'South-west backdrop',  rect: [-170, -392, 150, -150], count: 60,  radius: [13, 20], far: true },
+      // late = placed after the surveyed campus trees. onCampus = allowed inside the campus.
+      { name: 'Campus north edge',    rect: [345, 132, 700, 205],    count: 38,  radius: [11, 18], far: true, late: true, onCampus: true },
+      { name: 'Woods north-east',     rect: [560, 205, 930, 345],    count: 60,  radius: [13, 21], far: true, late: true },
+      { name: 'East of campus',       rect: [718, -335, 930, 205],   count: 95,  radius: [12, 19], far: true, late: true }
+    ],
+    acrossLamar: { count: 95, radius: [12, 19] }
+  },
+
+  /* ---------- VIEWPOINTS ---------- */
+  views: {
+    entrance: { x: 339.5, y: -409, lookDeg: 8 },   // lookDeg: 0 = north, 90 = east
+    aerial:   { targetX: 345, targetY: -125, distance: 640, heightDeg: 52, fromDeg: 184 }
+  },
+
+  /* ---------- LOOK ---------- */
+  colors: {
+    concrete: '#c9c8c2', slab: '#d3d1c8', stallLine: '#f7f7f2',
+    grassA: '#6f9a4a', grassB: '#84ab57', dirt: '#a8946d',
+    asphalt: '#3d3e42', roadYellow: '#e2b93b', sidewalk: '#cfcdc6',
+    fence: '#ab8c66', roof: '#5f7f78', roofUnder: '#d8c9ac', column: '#5a534b',
+    table: '#b98a56', stone: '#d6c8a6', houseRoof: '#6b625b', trim: '#f2efe6',
+    treeA: '#4f7f3a', treeB: '#5f8f3f', treeC: '#3f6f38', trunk: '#5c4a3a',
+    skyTop: '#4f8fd6', skyHorizon: '#dbe9f2',
+    // existing campus
+    campusAsphalt: '#68696d', campusLine: '#d9d9d4', ironFence: '#23262b',
+    masjidWall: '#e9dfc6', masjidStone: '#8b8475', masjidBase: '#a3826e', masjidRoof: '#f3f3ee',
+    dome: '#2c7a62', domeGold: '#d7b45a', courtBlue: '#2f66cf', courtGreen: '#43b24c', sand: '#d8c594',
+    woodWall: '#cfc391', woodRoof: '#80604c', schoolWall: '#e6dfcc', schoolRoof: '#8c7c6a'
+  },
+  sun: { fromDeg: 215, heightDeg: 52 },   // where the sun sits (0 = north, 90 = east)
+  fog: { walk: 0.0019, aerial: 0.00042 }, // bigger = hazier
+  clouds: true
+};
+</script>
+</head>
+
+<body>
+<div id="app">
+  <aside id="banner">
+    <div class="b-top">
+      <button id="bToggle" aria-label="About this project">Info</button>
+      <div class="b-eyebrow" id="bEyebrow"></div>
+      <h1 id="bTitle"></h1>
+      <div class="b-rule"></div>
+      <div id="bMessage"></div>
+      <ul id="bFacts"></ul>
+    </div>
+    <div class="b-bottom">
+      <div id="bQr"></div>
+      <div class="b-qrcap" id="bQrCap"></div>
+      <div class="b-footer" id="bFooter"></div>
+    </div>
+  </aside>
+
+  <main id="stage">
+    <canvas id="view"></canvas>
+    <div id="labels"></div>
+
+    <div id="hint"></div>
+    <div id="attract">Touch to explore</div>
+    <div id="fps"></div>
+
+    <div id="dpad" aria-label="Walk">
+      <button class="pad up"    data-move="fwd"   aria-label="Forward"><svg viewBox="0 0 24 24"><path d="M12 5l8 11H4z"/></svg></button>
+      <button class="pad left"  data-move="left"  aria-label="Left"><svg viewBox="0 0 24 24"><path d="M5 12l11-8v16z"/></svg></button>
+      <button class="pad right" data-move="right" aria-label="Right"><svg viewBox="0 0 24 24"><path d="M19 12L8 4v16z"/></svg></button>
+      <button class="pad down"  data-move="back"  aria-label="Back"><svg viewBox="0 0 24 24"><path d="M12 19l8-11H4z"/></svg></button>
+    </div>
+
+    <div id="actions">
+      <button id="btnAerial">Aerial overview</button>
+      <button id="btnEntrance">Entrance</button>
+    </div>
+
+    <div id="fatal"></div>
+  </main>
+</div>
+<script src="assets/app.js"></script>
+</body>
+</html>
